@@ -1,74 +1,56 @@
-name: Deploy Static Web Application
+name: Deploy to GitHub Pages
+
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - name: Checkout Source Code
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Initialize Node.js Environment
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
-      - name: Install Dependencies & Compile Production Build
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
         env:
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE.GEMINI_API_KEY }}
-        run: |
-          npm ci
-          npm run build
-      - name: Optionally enable Pages via Admin PAT
-        # Do not reference secrets in the `if:` expression to avoid evaluation errors in some contexts.
-        env:
-          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
-        run: |
-          if [ -z "$ADMIN_PAT" ]; then
-            echo "ADMIN_PAT not provided — skipping automatic Pages enable step."
-            exit 0
-          fi
-          echo "ADMIN_PAT detected — attempting to enable GitHub Pages (this step requires admin rights)."
-          set -e
-          # Attempt to configure Pages to serve from the main branch root. This requires an admin PAT.
-          RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $ADMIN_PAT" \
-            "https://api.github.com/repos/${{ github.repository }}/pages" \
-            -d '{"source":{"branch":"main","path":"/"}}') || true
-          if [[ "$RESP_CODE" =~ ^2 ]]; then
-            echo "Pages enable request returned status $RESP_CODE — proceeding."
-            # allow a short pause for the Pages configuration to take effect
-            sleep 3
-          else
-            echo "Pages enable request returned status $RESP_CODE. This may indicate insufficient permissions or other error."
-            echo "Proceeding to the Pages status check which will fail if Pages remains disabled."
-          fi
-      - name: Check GitHub Pages status
-        id: pages-check
-        run: |
-          echo "Checking whether GitHub Pages is enabled for this repository..."
-          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pages" || true)
-          echo "Pages API returned HTTP status: $STATUS_CODE"
-          if [ "$STATUS_CODE" = "404" ] || [ -z "$STATUS_CODE" ]; then
-            echo "\nERROR: GitHub Pages does not appear to be enabled for this repository."
-            echo "Please enable Pages at: https://github.com/${{ github.repository }}/settings/pages"
-            echo "Failing the job to avoid confusing deploy errors."
-            exit 1
-          else
-            echo "GitHub Pages is enabled (HTTP status: $STATUS_CODE). Continuing..."
-          fi
-      - name: Upload Static Build Assets
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+
+      - name: Disable Jekyll
+        run: touch dist/.nojekyll
+
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
-      - name: Publish to GitHub Pages
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
