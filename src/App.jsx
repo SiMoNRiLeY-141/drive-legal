@@ -169,8 +169,8 @@ export default function App() {
     return window.localStorage.getItem(STORAGE_KEYS.customApiKey) || '';
   });
   const [selectedModel, setSelectedModel] = useState(() => {
-    if (typeof window === 'undefined') return 'gemini-2.0-flash';
-    return window.localStorage.getItem('drivelegal_selected_model') || 'gemini-2.0-flash';
+    if (typeof window === 'undefined') return 'gemini-2.5-flash';
+    return window.localStorage.getItem('drivelegal_selected_model') || 'gemini-2.5-flash';
   });
   const [status, setStatus] = useState(() => {
     const savedCustomKey = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEYS.customApiKey) : '';
@@ -441,10 +441,10 @@ export default function App() {
                 }}
                 style={styles.keyPillSelect}
               >
-                <option value="gemini-2.0-flash">gemini-2.0-flash (default)</option>
+                <option value="gemini-2.5-flash">gemini-2.5-flash (default)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                 <option value="gemini-1.5-flash">gemini-1.5-flash</option>
                 <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
               </select>
               <div style={styles.keyPillActions}>
                 <button
@@ -541,10 +541,10 @@ export default function App() {
                   }}
                   style={styles.inlineModelSelect}
                 >
-                  <option value="gemini-2.0-flash">gemini-2.0-flash (default)</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash (default)</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                   <option value="gemini-1.5-flash">gemini-1.5-flash</option>
                   <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                 </select>
                 <button
                   type="button"
