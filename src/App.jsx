@@ -168,6 +168,10 @@ export default function App() {
     if (typeof window === 'undefined') return '';
     return window.localStorage.getItem(STORAGE_KEYS.customApiKey) || '';
   });
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window === 'undefined') return 'gemini-2.0-flash';
+    return window.localStorage.getItem('drivelegal_selected_model') || 'gemini-2.0-flash';
+  });
   const [status, setStatus] = useState(() => {
     const savedCustomKey = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEYS.customApiKey) : '';
     const active = savedCustomKey || GEMINI_API_KEY;
@@ -345,7 +349,7 @@ export default function App() {
       );
       const genAI = new GoogleGenerativeAI(resolvedKey);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: selectedModel,
         systemInstruction: SYSTEM_INSTRUCTION,
       });
 
@@ -426,6 +430,22 @@ export default function App() {
                 onChange={(e) => setTempKeyInput(e.target.value)}
                 style={styles.keyPillInput}
               />
+              <select
+                value={selectedModel}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedModel(val);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('drivelegal_selected_model', val);
+                  }
+                }}
+                style={styles.keyPillSelect}
+              >
+                <option value="gemini-2.0-flash">gemini-2.0-flash (default)</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              </select>
               <div style={styles.keyPillActions}>
                 <button
                   type="button"
@@ -447,24 +467,29 @@ export default function App() {
             </div>
           ) : (
             <div style={styles.keyPillDisplay}>
-              <span style={styles.keyPillValue}>
-                {customApiKey ? (
-                  <span style={{ color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
-                    Custom Active
-                  </span>
-                ) : GEMINI_API_KEY ? (
-                  <span style={{ color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#60a5fa', display: 'inline-block' }} />
-                    System Active
-                  </span>
-                ) : (
-                  <span style={{ color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f87171', display: 'inline-block' }} />
-                    Missing Key
-                  </span>
-                )}
-              </span>
+              <div>
+                <span style={styles.keyPillValue}>
+                  {customApiKey ? (
+                    <span style={{ color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                      Custom Active
+                    </span>
+                  ) : GEMINI_API_KEY ? (
+                    <span style={{ color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#60a5fa', display: 'inline-block' }} />
+                      System Active
+                    </span>
+                  ) : (
+                    <span style={{ color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f87171', display: 'inline-block' }} />
+                      Missing Key
+                    </span>
+                  )}
+                </span>
+                <span style={{ display: 'block', fontSize: '0.74rem', color: 'rgba(239, 246, 255, 0.45)', marginTop: '4px' }}>
+                  Model: {selectedModel}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleStartEditKey}
@@ -505,6 +530,22 @@ export default function App() {
                   onChange={(e) => setTempKeyInput(e.target.value)}
                   style={styles.inlineKeyInput}
                 />
+                <select
+                  value={selectedModel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedModel(val);
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('drivelegal_selected_model', val);
+                    }
+                  }}
+                  style={styles.inlineModelSelect}
+                >
+                  <option value="gemini-2.0-flash">gemini-2.0-flash (default)</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                </select>
                 <button
                   type="button"
                   onClick={handleSaveKey}
@@ -1134,5 +1175,27 @@ const styles = {
     fontWeight: 700,
     cursor: 'pointer',
     transition: 'background 0.2s',
+  },
+  keyPillSelect: {
+    background: 'rgba(0, 0, 0, 0.3)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    fontSize: '0.86rem',
+    color: '#fff',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    cursor: 'pointer',
+  },
+  inlineModelSelect: {
+    borderRadius: '10px',
+    border: '1px solid #cbd5e1',
+    padding: '8px 10px',
+    fontSize: '0.9rem',
+    outline: 'none',
+    background: '#fff',
+    color: '#0f172a',
+    cursor: 'pointer',
   },
 };
