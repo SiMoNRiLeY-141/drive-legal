@@ -346,6 +346,7 @@ export default function App() {
       });
     } catch (error) {
       const message = String(error?.message || error);
+      console.error('DriveLegal Gemini API Error:', error);
 
       if (message.includes('REQUEST_TIMEOUT')) {
         setStatus({
@@ -355,12 +356,12 @@ export default function App() {
       } else if (/api key|permission|unauthorized|invalid/i.test(message)) {
         setStatus({
           kind: 'error',
-          message: 'The Gemini API key appears invalid or unauthorized. Replace it and save again.',
+          message: `The Gemini API key appears invalid or unauthorized: ${message}`,
         });
       } else {
         setStatus({
           kind: 'error',
-          message: 'Unable to complete the analysis. Use the latest saved history or retry with a stable network.',
+          message: `Unable to complete the analysis: ${message}`,
         });
       }
     } finally {
