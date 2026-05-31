@@ -4,6 +4,14 @@
 
 ---
 
+## 🔗 Project Links
+
+- **GitHub Repository**: https://github.com/SiMoNRiLeY-141/drive-legal
+- **GitHub Pages Demo**: https://SiMoNRiLeY-141.github.io/drive-legal/
+- **Deployment Workflow**: [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
+
+---
+
 ## 📖 Project Overview
 
 **DriveLegal** is a client-side web application designed to empower citizens facing traffic citations or "challans." By combining localized traffic code databases with the reasoning power of the **Google Gemini API**, DriveLegal translates complex legal citations into clear, actionable advice. 
@@ -66,28 +74,64 @@ The project is built to run entirely on the client side, ensuring privacy and ra
 
 ---
 
+## 📦 Setup for ZIP Submission
+
+If this project is shared as a `.zip` file, use the steps below after extracting it to a local folder.
+
+1. **Extract the archive** to a folder of your choice.
+2. **Open a terminal** in the extracted project directory.
+3. **Install Node.js 20+** if it is not already installed.
+4. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+5. **Get a new Gemini API key**:
+   - Open [Google AI Studio](https://aistudio.google.com/app/apikey).
+   - Sign in with your Google account.
+   - Click **Create API key** and choose or create a Google Cloud project when prompted.
+   - Copy the generated key and keep it private.
+6. **Add your Gemini API key** in a `.env.local` file if you want live AI responses:
+   ```env
+   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+7. **Start the app**:
+   ```bash
+   npm run dev
+   ```
+8. **Build for submission or deployment**:
+   ```bash
+   npm run build
+   ```
+
+---
+
 ## 🚀 Running Locally
 
-1. **Clone and Install Dependencies**:
+1. **Clone or extract the project**:
    ```bash
-   git clone <repository-url>
    cd drive-legal
+   ```
+
+   If you are using the ZIP submission, extract it first and open the extracted folder instead of cloning.
+
+2. **Install Dependencies**:
+   ```bash
    npm install
    ```
 
-2. **Configure API Key (Optional)**:
-   Create a `.env.local` file in the root directory to preset a Gemini API key:
+3. **Configure API Key (Optional)**:
+   If you need a new key, create one in [Google AI Studio](https://aistudio.google.com/app/apikey), then place it in a `.env.local` file in the root directory:
    ```env
    VITE_GEMINI_API_KEY=your_gemini_api_key_here
    ```
    *Note: If not preset, you can input your key directly into the application header at runtime.*
 
-3. **Start Dev Server**:
+4. **Start Dev Server**:
    ```bash
    npm run dev
    ```
 
-4. **Production Build**:
+5. **Production Build**:
    ```bash
    npm run build
    npm run preview

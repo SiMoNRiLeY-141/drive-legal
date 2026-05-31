@@ -82,6 +82,23 @@ const COUNTRIES_AND_STATES = {
   Other: [],
 };
 
+const STANDARD_COUNTRIES = ["India", "United States", "United Kingdom"];
+
+function getStatesForCountry(country) {
+  switch (country) {
+    case "India":
+      return COUNTRIES_AND_STATES.India;
+    case "United States":
+      return COUNTRIES_AND_STATES["United States"];
+    case "United Kingdom":
+      return COUNTRIES_AND_STATES["United Kingdom"];
+    case "Other":
+      return COUNTRIES_AND_STATES.Other;
+    default:
+      return [];
+  }
+}
+
 const LANGUAGES = [
   { name: "English", code: "en" },
   { name: "Hindi (हिन्दी)", code: "hi" },
@@ -103,7 +120,7 @@ function getStoredLanguage() {
       const value = googtransCookie.split("=")[1];
       const decoded = decodeURIComponent(value);
       const parts = decoded.split("/");
-      return parts[parts.length - 1] || "en";
+      return parts.at(-1) || "en";
     }
   } catch (e) {
     console.error("Error reading googtrans cookie", e);
@@ -487,11 +504,17 @@ function MarkdownRenderer({ markdown }) {
         trimmedLine.match(/^#{1,3}/)?.[0].length ?? 1,
         3,
       );
+      let headingStyle = styles.markdownHeading1;
+      if (headingLevel === 2) {
+        headingStyle = styles.markdownHeading2;
+      } else if (headingLevel === 3) {
+        headingStyle = styles.markdownHeading3;
+      }
       const HeadingTag = `h${headingLevel}`;
       nodes.push(
         <HeadingTag
           key={`heading-${nodes.length}`}
-          style={styles[`markdownHeading${headingLevel}`]}
+          style={headingStyle}
         >
           {parseInlineMarkdown(trimmedLine.replace(/^#{1,3}\s+/, ""))}
         </HeadingTag>,
@@ -852,7 +875,20 @@ Yours faithfully,
 
   const updateField = (field) => (event) => {
     const value = event.target.value;
-    setForm((current) => ({ ...current, [field]: value }));
+
+    if (field === "city") {
+      setForm((current) => ({ ...current, city: value }));
+      return;
+    }
+
+    if (field === "vehicleType") {
+      setForm((current) => ({ ...current, vehicleType: value }));
+      return;
+    }
+
+    if (field === "violation") {
+      setForm((current) => ({ ...current, violation: value }));
+    }
   };
 
   const validateForm = () => {
@@ -947,11 +983,7 @@ Yours faithfully,
             "";
 
           // Map country
-          const isStandardCountry = [
-            "India",
-            "United States",
-            "United Kingdom",
-          ].includes(country);
+          const isStandardCountry = STANDARD_COUNTRIES.includes(country);
           const standardCountry = isStandardCountry ? country : "Other";
           const customCountryVal = isStandardCountry ? "" : country;
 
@@ -959,7 +991,7 @@ Yours faithfully,
           let standardState = "";
           let customStateVal = "";
           if (isStandardCountry) {
-            const statesList = COUNTRIES_AND_STATES[country] || [];
+            const statesList = getStatesForCountry(country);
             if (statesList.includes(state)) {
               standardState = state;
             } else {
@@ -1134,18 +1166,14 @@ Yours faithfully,
     setActiveHistoryId(entry.id);
 
     // Set form fields based on selected history item
-    const isStandardCountry = [
-      "India",
-      "United States",
-      "United Kingdom",
-    ].includes(entry.country);
+    const isStandardCountry = STANDARD_COUNTRIES.includes(entry.country);
     const standardCountry = isStandardCountry ? entry.country : "Other";
     const customCountryVal = isStandardCountry ? "" : entry.country;
 
     let standardState = "";
     let customStateVal = "";
     if (isStandardCountry) {
-      const statesList = COUNTRIES_AND_STATES[entry.country] || [];
+      const statesList = getStatesForCountry(entry.country);
       if (statesList.includes(entry.state)) {
         standardState = entry.state;
       } else {
@@ -1713,7 +1741,7 @@ Yours faithfully,
                     onChange={handleStateChange}
                     style={styles.input}
                   >
-                    {(COUNTRIES_AND_STATES[form.country] || []).map((st) => (
+                      {getStatesForCountry(form.country).map((st) => (
                       <option key={st} value={st}>
                         {st}
                       </option>
