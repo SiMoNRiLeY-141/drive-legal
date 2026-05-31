@@ -25,11 +25,37 @@ jobs:
         run: |
           npm ci
           npm run build
+      - name: Optionally enable Pages via Admin PAT
+        # Do not reference secrets in the `if:` expression to avoid evaluation errors in some contexts.
+        env:
+          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
+        run: |
+          if [ -z "$ADMIN_PAT" ]; then
+            echo "ADMIN_PAT not provided — skipping automatic Pages enable step."
+            exit 0
+          fi
+          echo "ADMIN_PAT detected — attempting to enable GitHub Pages (this step requires admin rights)."
+          set -e
+          # Attempt to configure Pages to serve from the main branch root. This requires an admin PAT.
+          RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $ADMIN_PAT" \
+            "https://api.github.com/repos/${{ github.repository }}/pages" \
+            -d '{"source":{"branch":"main","path":"/"}}') || true
+          if [[ "$RESP_CODE" =~ ^2 ]]; then
+            echo "Pages enable request returned status $RESP_CODE — proceeding."
+            # allow a short pause for the Pages configuration to take effect
+            sleep 3
+          else
+            echo "Pages enable request returned status $RESP_CODE. This may indicate insufficient permissions or other error."
+            echo "Proceeding to the Pages status check which will fail if Pages remains disabled."
+          fi
       - name: Check GitHub Pages status
         id: pages-check
         run: |
           echo "Checking whether GitHub Pages is enabled for this repository..."
-          STATUS_CODE=$(curl -s -o /dev/stderr -w "%{http_code}" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pages" 2>&1 >/dev/null || true)
+          STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/${{ github.repository }}/pages" || true)
+          echo "Pages API returned HTTP status: $STATUS_CODE"
           if [ "$STATUS_CODE" = "404" ] || [ -z "$STATUS_CODE" ]; then
             echo "\nERROR: GitHub Pages does not appear to be enabled for this repository."
             echo "Please enable Pages at: https://github.com/${{ github.repository }}/settings/pages"
@@ -37,23 +63,6 @@ jobs:
             exit 1
           else
             echo "GitHub Pages is enabled (HTTP status: $STATUS_CODE). Continuing..."
-          fi
-      - name: Optionally enable Pages via Admin PAT
-        if: ${{ secrets.ADMIN_PAT != '' }}
-        run: |
-          echo "ADMIN_PAT detected — attempting to enable GitHub Pages (this step requires admin rights)."
-          set -e
-          # Attempt to configure Pages to serve from the main branch root. This requires an admin PAT.
-          RESP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.ADMIN_PAT }}" \
-            "https://api.github.com/repos/${{ github.repository }}/pages" \
-            -d '{"source":{"branch":"main","path":"/"}}') || true
-          if [[ "$RESP_CODE" =~ ^2 ]]; then
-            echo "Pages enable request returned status $RESP_CODE — proceeding."
-          else
-            echo "Pages enable request returned status $RESP_CODE. This may indicate insufficient permissions or other error."
-            echo "Proceeding to the Pages status check which will fail if Pages remains disabled."
           fi
       - name: Upload Static Build Assets
         uses: actions/upload-pages-artifact@v3
