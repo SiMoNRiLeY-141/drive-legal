@@ -325,6 +325,12 @@ export default function App() {
     });
 
     try {
+      console.log(
+        'DriveLegal Gemini Request API Key:',
+        activeApiKey
+          ? `${activeApiKey.substring(0, 6)}...${activeApiKey.substring(activeApiKey.length - 4)}`
+          : 'None'
+      );
       const genAI = new GoogleGenerativeAI(activeApiKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-2.0-flash',
