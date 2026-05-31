@@ -327,7 +327,7 @@ export default function App() {
     try {
       const genAI = new GoogleGenerativeAI(activeApiKey);
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         systemInstruction: SYSTEM_INSTRUCTION,
       });
 
