@@ -481,75 +481,13 @@ function Spinner() {
 
 export default function App() {
   const [history, setHistory] = useState(() => readStoredHistory());
-  const [activeHistoryId, setActiveHistoryId] = useState(() => {
-    const hist = readStoredHistory();
-    return hist[0]?.id || "";
-  });
+  const [activeHistoryId, setActiveHistoryId] = useState("");
 
-  const [form, setForm] = useState(() => {
-    const hist = readStoredHistory();
-    if (hist.length > 0) {
-      const entry = hist[0];
-      const isStandardCountry = [
-        "India",
-        "United States",
-        "United Kingdom",
-      ].includes(entry.country);
-      const standardCountry = isStandardCountry ? entry.country : "Other";
-      let standardState = "";
-      if (isStandardCountry) {
-        const statesList = COUNTRIES_AND_STATES[entry.country] || [];
-        if (statesList.includes(entry.state)) {
-          standardState = entry.state;
-        } else {
-          standardState = "Other";
-        }
-      }
-      return {
-        country: standardCountry,
-        state: standardState,
-        city: entry.city,
-        vehicleType: entry.vehicleType,
-        violation: entry.violation,
-      };
-    }
-    return DEFAULT_FORM;
-  });
+  const [form, setForm] = useState(DEFAULT_FORM);
 
-  const [customCountry, setCustomCountry] = useState(() => {
-    const hist = readStoredHistory();
-    if (hist.length > 0) {
-      const entry = hist[0];
-      const isStandardCountry = [
-        "India",
-        "United States",
-        "United Kingdom",
-      ].includes(entry.country);
-      return isStandardCountry ? "" : entry.country;
-    }
-    return "";
-  });
+  const [customCountry, setCustomCountry] = useState("");
 
-  const [customState, setCustomState] = useState(() => {
-    const hist = readStoredHistory();
-    if (hist.length > 0) {
-      const entry = hist[0];
-      const isStandardCountry = [
-        "India",
-        "United States",
-        "United Kingdom",
-      ].includes(entry.country);
-      if (isStandardCountry) {
-        const statesList = COUNTRIES_AND_STATES[entry.country] || [];
-        if (!statesList.includes(entry.state)) {
-          return entry.state;
-        }
-      } else {
-        return entry.state;
-      }
-    }
-    return "";
-  });
+  const [customState, setCustomState] = useState("");
 
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "light";
@@ -560,10 +498,7 @@ export default function App() {
       : "light";
   });
 
-  const [analysis, setAnalysis] = useState(() => {
-    const hist = readStoredHistory();
-    return hist[0]?.report || "";
-  });
+  const [analysis, setAnalysis] = useState("");
 
   const [customApiKey, setCustomApiKey] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -1082,8 +1017,6 @@ Yours faithfully,
     });
   };
 
-  const latestHistory = useMemo(() => history[0] ?? null, [history]);
-
   const activeStepIndex = useMemo(() => {
     if (!activeApiKey) return 0;
     if (!isFormFilled) return 1;
@@ -1091,7 +1024,7 @@ Yours faithfully,
   }, [activeApiKey, isFormFilled]);
 
   const activeHistoryEntry =
-    history.find((entry) => entry.id === activeHistoryId) || latestHistory;
+    history.find((entry) => entry.id === activeHistoryId) || null;
 
   return (
     <div style={styles.shell}>
