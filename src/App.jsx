@@ -477,7 +477,26 @@ export default function App() {
           </div>
 
           <div style={styles.statusBar} data-kind={status.kind}>
-            {status.message || 'Ready for secure analysis.'}
+            <div>{status.message || 'Ready for secure analysis.'}</div>
+            {status.kind === 'error' && (!activeApiKey || /api key|quota|limit|429|403|unauthorized/i.test(status.message)) && (
+              <div style={styles.inlineKeyEditor}>
+                <input
+                  type="password"
+                  placeholder="Paste your Gemini API key (AIzaSy...) here"
+                  value={tempKeyInput}
+                  onChange={(e) => setTempKeyInput(e.target.value)}
+                  style={styles.inlineKeyInput}
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveKey}
+                  style={styles.inlineKeySaveBtn}
+                  className="inline-key-save-btn"
+                >
+                  Apply Key
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={styles.formGrid}>
@@ -1070,5 +1089,32 @@ const styles = {
     borderTopColor: '#fff',
     display: 'inline-block',
     animation: 'drivelegal-spin 0.8s linear infinite',
+  },
+  inlineKeyEditor: {
+    marginTop: '12px',
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  inlineKeyInput: {
+    flex: '1 1 240px',
+    borderRadius: '10px',
+    border: '1px solid #cbd5e1',
+    padding: '8px 12px',
+    fontSize: '0.9rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  inlineKeySaveBtn: {
+    background: '#0f4c81',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '8px 14px',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'background 0.2s',
   },
 };
