@@ -301,7 +301,19 @@ export default function App() {
       return;
     }
 
-    if (!activeApiKey) {
+    // UX Safety Net: Auto-apply key from input field if user forgot to click "Apply Key" / "Save"
+    let resolvedKey = activeApiKey;
+    const trimmedTemp = tempKeyInput.trim();
+    if (trimmedTemp && trimmedTemp !== customApiKey) {
+      setCustomApiKey(trimmedTemp);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEYS.customApiKey, trimmedTemp);
+      }
+      resolvedKey = trimmedTemp;
+      console.log('Auto-applying API Key from input field:', `${trimmedTemp.substring(0, 6)}...`);
+    }
+
+    if (!resolvedKey) {
       setStatus({
         kind: 'error',
         message: 'Missing Gemini API Key. Setup your key in the header to enable DriveLegal analysis.',
@@ -327,11 +339,11 @@ export default function App() {
     try {
       console.log(
         'DriveLegal Gemini Request API Key:',
-        activeApiKey
-          ? `${activeApiKey.substring(0, 6)}...${activeApiKey.substring(activeApiKey.length - 4)}`
+        resolvedKey
+          ? `${resolvedKey.substring(0, 6)}...${resolvedKey.substring(resolvedKey.length - 4)}`
           : 'None'
       );
-      const genAI = new GoogleGenerativeAI(activeApiKey);
+      const genAI = new GoogleGenerativeAI(resolvedKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-2.0-flash',
         systemInstruction: SYSTEM_INSTRUCTION,
