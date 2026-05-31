@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const STORAGE_KEYS = {
   history: 'drivelegal_saved_history',
+  customApiKey: 'drivelegal_custom_api_key',
 };
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY?.trim() || '';
@@ -25,15 +26,7 @@ const DEFAULT_FORM = {
   violation: '',
 };
 
-const INITIAL_STATUS = GEMINI_API_KEY
-  ? {
-      kind: 'idle',
-      message: '',
-    }
-  : {
-      kind: 'error',
-      message: 'Missing environment variable: VITE_GEMINI_API_KEY. Add it to your Vite environment before using DriveLegal.',
-    };
+
 
 function readStoredHistory() {
   if (typeof window === 'undefined') return [];
@@ -171,9 +164,60 @@ export default function App() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [history, setHistory] = useState(() => readStoredHistory());
   const [analysis, setAnalysis] = useState(() => readStoredHistory()[0]?.report || '');
-  const [status, setStatus] = useState(INITIAL_STATUS);
+  const [customApiKey, setCustomApiKey] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem(STORAGE_KEYS.customApiKey) || '';
+  });
+  const [status, setStatus] = useState(() => {
+    const savedCustomKey = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEYS.customApiKey) : '';
+    const active = savedCustomKey || GEMINI_API_KEY;
+    return active
+      ? { kind: 'idle', message: '' }
+      : {
+          kind: 'error',
+          message: 'Missing Gemini API Key. Setup your key in the header to enable DriveLegal analysis.',
+        };
+  });
   const [loading, setLoading] = useState(false);
   const [activeHistoryId, setActiveHistoryId] = useState(() => readStoredHistory()[0]?.id || '');
+  const [isEditingKey, setIsEditingKey] = useState(false);
+  const [tempKeyInput, setTempKeyInput] = useState('');
+
+  const activeApiKey = useMemo(() => {
+    return customApiKey || GEMINI_API_KEY;
+  }, [customApiKey]);
+
+  const handleStartEditKey = () => {
+    setTempKeyInput(customApiKey);
+    setIsEditingKey(true);
+  };
+
+  const handleSaveKey = () => {
+    const trimmed = tempKeyInput.trim();
+    setCustomApiKey(trimmed);
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        window.localStorage.setItem(STORAGE_KEYS.customApiKey, trimmed);
+      } else {
+        window.localStorage.removeItem(STORAGE_KEYS.customApiKey);
+      }
+    }
+
+    const activeKey = trimmed || GEMINI_API_KEY;
+    if (activeKey) {
+      setStatus({ kind: 'idle', message: '' });
+    } else {
+      setStatus({
+        kind: 'error',
+        message: 'Missing Gemini API Key. Setup your key in the header to enable DriveLegal analysis.',
+      });
+    }
+    setIsEditingKey(false);
+  };
+
+  const handleCancelEditKey = () => {
+    setIsEditingKey(false);
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -257,10 +301,10 @@ export default function App() {
       return;
     }
 
-    if (!GEMINI_API_KEY) {
+    if (!activeApiKey) {
       setStatus({
         kind: 'error',
-        message: 'Missing environment variable: VITE_GEMINI_API_KEY. Add it to your Vite environment before using DriveLegal.',
+        message: 'Missing Gemini API Key. Setup your key in the header to enable DriveLegal analysis.',
       });
       return;
     }
@@ -281,7 +325,7 @@ export default function App() {
     });
 
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+      const genAI = new GoogleGenerativeAI(activeApiKey);
       const model = genAI.getGenerativeModel({
         model: 'gemini-1.5-flash',
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -350,6 +394,68 @@ export default function App() {
           <p style={styles.subtitle}>
             Fast legal triage for traffic challans with secure Gemini access, localized context, and offline-ready history.
           </p>
+        </div>
+
+        <div style={styles.keyPill} aria-label="Gemini API Key configuration">
+          <span style={styles.keyPillLabel}>Gemini API Key</span>
+          {isEditingKey ? (
+            <div style={styles.keyPillEditor}>
+              <input
+                type="password"
+                placeholder="AIzaSy... (leave empty to reset)"
+                value={tempKeyInput}
+                onChange={(e) => setTempKeyInput(e.target.value)}
+                style={styles.keyPillInput}
+              />
+              <div style={styles.keyPillActions}>
+                <button
+                  type="button"
+                  onClick={handleSaveKey}
+                  style={styles.keyPillBtnPrimary}
+                  className="key-pill-btn-primary"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEditKey}
+                  style={styles.keyPillBtnSecondary}
+                  className="key-pill-btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={styles.keyPillDisplay}>
+              <span style={styles.keyPillValue}>
+                {customApiKey ? (
+                  <span style={{ color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+                    Custom Active
+                  </span>
+                ) : GEMINI_API_KEY ? (
+                  <span style={{ color: '#60a5fa', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#60a5fa', display: 'inline-block' }} />
+                    System Active
+                  </span>
+                ) : (
+                  <span style={{ color: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f87171', display: 'inline-block' }} />
+                    Missing Key
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={handleStartEditKey}
+                style={styles.keyPillEditBtn}
+                className="key-pill-edit-btn"
+              >
+                {customApiKey || GEMINI_API_KEY ? 'Change' : 'Setup'}
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -561,6 +667,7 @@ const styles = {
     margin: '0 auto 24px',
     display: 'flex',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: '24px',
     alignItems: 'flex-start',
     position: 'relative',
@@ -589,26 +696,89 @@ const styles = {
     color: 'rgba(248, 251, 255, 0.78)',
   },
   keyPill: {
-    minWidth: '200px',
+    minWidth: '220px',
     borderRadius: '18px',
-    padding: '16px 18px',
+    padding: '14px 16px',
     border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(7, 12, 24, 0.55)',
+    background: 'rgba(7, 12, 24, 0.65)',
     backdropFilter: 'blur(12px)',
     color: '#eff6ff',
     boxShadow: '0 16px 40px rgba(15, 23, 42, 0.2)',
   },
   keyPillLabel: {
     display: 'block',
-    fontSize: '0.78rem',
+    fontSize: '0.74rem',
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
-    color: 'rgba(239, 246, 255, 0.7)',
-    marginBottom: '8px',
+    color: 'rgba(239, 246, 255, 0.6)',
+    marginBottom: '6px',
   },
   keyPillValue: {
-    fontSize: '1rem',
+    fontSize: '0.92rem',
     fontWeight: 700,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  keyPillDisplay: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  keyPillEditBtn: {
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    borderRadius: '8px',
+    padding: '4px 8px',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: '#fff',
+    cursor: 'pointer',
+    transition: 'background 0.2s, transform 0.1s',
+  },
+  keyPillEditor: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  keyPillInput: {
+    background: 'rgba(0, 0, 0, 0.3)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '8px',
+    padding: '6px 10px',
+    fontSize: '0.86rem',
+    color: '#fff',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  keyPillActions: {
+    display: 'flex',
+    gap: '6px',
+    justifyContent: 'flex-end',
+  },
+  keyPillBtnPrimary: {
+    background: '#3b82f6',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '4px 10px',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: '#fff',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  },
+  keyPillBtnSecondary: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '4px 10px',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: 'rgba(255, 255, 255, 0.8)',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
   },
   stepStrip: {
     maxWidth: '1180px',

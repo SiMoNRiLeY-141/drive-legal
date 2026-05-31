@@ -109,3 +109,26 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+@keyframes drivelegal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.key-pill-edit-btn:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  transform: translateY(-1px);
+}
+.key-pill-edit-btn:active {
+  transform: translateY(0);
+}
+.key-pill-btn-primary:hover {
+  background: #2563eb !important;
+}
+.key-pill-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+
+
