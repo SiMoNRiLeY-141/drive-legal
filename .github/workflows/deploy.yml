@@ -21,7 +21,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          env: # <--- ADD THIS BLOCK
+        env: # <--- ADD THIS BLOCK
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
       - name: Upload Static Build Assets
         uses: actions/upload-pages-artifact@v3
