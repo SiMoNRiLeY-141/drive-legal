@@ -82,6 +82,61 @@ const COUNTRIES_AND_STATES = {
   Other: [],
 };
 
+const LANGUAGES = [
+  { name: "English", code: "en" },
+  { name: "Hindi (हिन्दी)", code: "hi" },
+  { name: "Tamil (தமிழ்)", code: "ta" },
+  { name: "Telugu (తెలుగు)", code: "te" },
+  { name: "Kannada (ಕನ್ನಡ)", code: "kn" },
+  { name: "Malayalam (മലയാളം)", code: "ml" },
+  { name: "Marathi (मराठी)", code: "mr" },
+  { name: "Bengali (বাংলা)", code: "bn" },
+  { name: "Gujarati (ગુજરાતી)", code: "gu" },
+];
+
+function getStoredLanguage() {
+  if (typeof document === "undefined") return "en";
+  try {
+    const cookies = document.cookie.split("; ");
+    const googtransCookie = cookies.find((row) => row.startsWith("googtrans="));
+    if (googtransCookie) {
+      const value = googtransCookie.split("=")[1];
+      const decoded = decodeURIComponent(value);
+      const parts = decoded.split("/");
+      return parts[parts.length - 1] || "en";
+    }
+  } catch (e) {
+    console.error("Error reading googtrans cookie", e);
+  }
+  return "en";
+}
+
+const changeGoogleTranslateLanguage = (code) => {
+  try {
+    document.cookie = "googtrans=/en/" + code + "; path=/";
+    document.cookie =
+      "googtrans=/en/" + code + "; path=/; domain=" + window.location.hostname;
+
+    const selectEl = document.querySelector(".goog-te-combo");
+    if (selectEl) {
+      selectEl.value = code;
+      selectEl.dispatchEvent(new Event("change"));
+    } else {
+      setTimeout(() => {
+        const retryEl = document.querySelector(".goog-te-combo");
+        if (retryEl) {
+          retryEl.value = code;
+          retryEl.dispatchEvent(new Event("change"));
+        } else {
+          window.location.reload();
+        }
+      }, 300);
+    }
+  } catch (e) {
+    console.error("Error changing translation language:", e);
+  }
+};
+
 const DEFAULT_FORM = {
   country: "India",
   state: "Tamil Nadu",
@@ -489,6 +544,10 @@ export default function App() {
 
   const [customState, setCustomState] = useState("");
 
+  const [preferredLanguage, setPreferredLanguage] = useState(() =>
+    getStoredLanguage(),
+  );
+
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "light";
     const saved = window.localStorage.getItem("drivelegal_theme");
@@ -529,6 +588,7 @@ export default function App() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   const isFormFilled = useMemo(() => {
     const finalCountry =
@@ -831,11 +891,126 @@ Yours faithfully,
       city: safeString(form.city),
       vehicleType: form.vehicleType,
       violation: safeString(form.violation),
+      preferredLanguage: preferredLanguage,
       report: reportText,
     };
 
     setHistory((current) => [entry, ...current].slice(0, 20));
     setActiveHistoryId(entry.id);
+  };
+
+  const detectGPSLocation = () => {
+    if (!navigator.geolocation) {
+      setStatus({
+        kind: "error",
+        message: "Geolocation is not supported by this browser.",
+      });
+      return;
+    }
+
+    setGpsLoading(true);
+    setStatus({ kind: "idle", message: "Requesting GPS coordinates..." });
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setStatus({
+          kind: "idle",
+          message: "Coordinates acquired. Resolving address...",
+        });
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+            {
+              headers: {
+                "Accept-Language": "en",
+                "User-Agent": "DriveLegal-RoadSafetyHackathon",
+              },
+            },
+          );
+
+          if (!res.ok) throw new Error("Reverse geocoding request failed.");
+          const data = await res.json();
+
+          if (!data || !data.address) {
+            throw new Error("Address data not found.");
+          }
+
+          const country = data.address.country || "";
+          const state = data.address.state || "";
+          const city =
+            data.address.city ||
+            data.address.town ||
+            data.address.village ||
+            data.address.suburb ||
+            "";
+
+          // Map country
+          const isStandardCountry = [
+            "India",
+            "United States",
+            "United Kingdom",
+          ].includes(country);
+          const standardCountry = isStandardCountry ? country : "Other";
+          const customCountryVal = isStandardCountry ? "" : country;
+
+          // Map state
+          let standardState = "";
+          let customStateVal = "";
+          if (isStandardCountry) {
+            const statesList = COUNTRIES_AND_STATES[country] || [];
+            if (statesList.includes(state)) {
+              standardState = state;
+            } else {
+              standardState = "Other";
+              customStateVal = state;
+            }
+          } else {
+            customStateVal = state;
+          }
+
+          setForm((prev) => ({
+            ...prev,
+            country: standardCountry,
+            state: standardState,
+            city: city,
+          }));
+          setCustomCountry(customCountryVal);
+          setCustomState(customStateVal);
+
+          setStatus({
+            kind: "success",
+            message: `Detected location: ${city ? city + ", " : ""}${state ? state + ", " : ""}${country}`,
+          });
+        } catch (error) {
+          console.error("GPS Reverse Geocoding Error:", error);
+          setStatus({
+            kind: "error",
+            message: `Failed to resolve address: ${error.message}`,
+          });
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("GPS Retrieval Error:", error);
+        let errorMsg = "Failed to acquire GPS coordinates.";
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMsg = "GPS location access denied by browser settings.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMsg = "GPS location info is currently unavailable.";
+        } else if (error.code === error.TIMEOUT) {
+          errorMsg = "GPS location request timed out.";
+        }
+        setStatus({
+          kind: "error",
+          message: errorMsg,
+        });
+        setGpsLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
   };
 
   const runAnalysis = async () => {
@@ -874,11 +1049,16 @@ Yours faithfully,
       form.country === "Other" ? customCountry : form.country;
     const finalState = form.state === "Other" ? customState : form.state;
 
+    const selectedLangObj =
+      LANGUAGES.find((l) => l.code === preferredLanguage) || LANGUAGES[0];
+    const langName = selectedLangObj.name.split(" ")[0];
+
     const prompt = [
       `Location: Country=${safeString(finalCountry)}; State=${safeString(finalState)}; City=${safeString(form.city)}`,
       `Vehicle Type: ${form.vehicleType}`,
       `Violation: ${safeString(form.violation)}`,
-      "Produce a concise legal breakdown with clear markdown bullets and labeled sections.",
+      `Preferred Language for Analysis Output: ${langName}`,
+      `Produce a concise legal breakdown with clear markdown bullets and labeled sections. The entire breakdown, explanations, compounding liabilities, and dispute/appeal action guides MUST be written natively in ${langName}.`,
     ].join("\n");
 
     setLoading(true);
@@ -986,6 +1166,10 @@ Yours faithfully,
     setCustomCountry(customCountryVal);
     setCustomState(customStateVal);
 
+    const nextLang = entry.preferredLanguage || "en";
+    setPreferredLanguage(nextLang);
+    changeGoogleTranslateLanguage(nextLang);
+
     setStatus({
       kind: "success",
       message: "Loaded a cached report from local storage.",
@@ -1008,6 +1192,8 @@ Yours faithfully,
     setForm(DEFAULT_FORM);
     setCustomCountry("");
     setCustomState("");
+    setPreferredLanguage("en");
+    changeGoogleTranslateLanguage("en");
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(STORAGE_KEYS.history);
     }
@@ -1015,6 +1201,11 @@ Yours faithfully,
       kind: "idle",
       message: "History cleared successfully.",
     });
+  };
+
+  const handleLanguageChange = (code) => {
+    setPreferredLanguage(code);
+    changeGoogleTranslateLanguage(code);
   };
 
   const activeStepIndex = useMemo(() => {
@@ -1039,6 +1230,20 @@ Yours faithfully,
         </div>
 
         <div style={styles.headerRight}>
+          <div id="google_translate_element" style={{ display: "none" }} />
+          <select
+            value={preferredLanguage}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            style={styles.navLanguageSelect}
+            className="nav-language-select"
+            aria-label="Select Language"
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
@@ -1295,7 +1500,39 @@ Yours faithfully,
       <main style={styles.grid}>
         <section style={styles.card}>
           <div style={styles.cardHeader}>
-            <h2 style={styles.cardTitle}>1. Challan Details</h2>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
+              <h2 style={styles.cardTitle}>1. Challan Details</h2>
+              <button
+                type="button"
+                onClick={detectGPSLocation}
+                style={styles.gpsBtn}
+                className="gps-btn"
+                disabled={gpsLoading}
+              >
+                {gpsLoading ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <Spinner />
+                    Locating...
+                  </span>
+                ) : (
+                  "📍 Use GPS Location"
+                )}
+              </button>
+            </div>
             <p style={styles.cardNote}>
               Provide enough jurisdiction and incident context for localized
               legal reasoning.
@@ -2693,6 +2930,32 @@ const styles = {
     color: "#ef4444",
     cursor: "pointer",
     transition: "all 0.2s ease-in-out",
+  },
+  gpsBtn: {
+    background: "transparent",
+    border: "1px solid var(--border-card-hover)",
+    borderRadius: "10px",
+    padding: "6px 12px",
+    fontSize: "0.86rem",
+    fontWeight: 700,
+    color: "var(--text-heading)",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  navLanguageSelect: {
+    background: "var(--bg-input)",
+    border: "1px solid var(--border-input)",
+    borderRadius: "12px",
+    padding: "8px 12px",
+    fontSize: "0.88rem",
+    fontWeight: 700,
+    color: "var(--text-input)",
+    cursor: "pointer",
+    outline: "none",
+    transition: "all 0.2s ease",
   },
   letterTextarea: {
     width: "100%",

@@ -400,3 +400,71 @@ textarea:focus {
 .clear-history-btn:active {
   transform: translateY(0);
 }
+
+/* Google Translate Widget Overrides & Hiding Default UI */
+#google_translate_element {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide default Google Translate bar and frames */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+
+.skiptranslate:not(.goog-te-combo) {
+  display: none !important;
+}
+
+body {
+  top: 0px !important;
+}
+
+/* Custom premium navigation language selector styles */
+.nav-language-select {
+  margin-right: 8px;
+  cursor: pointer;
+  outline: none;
+  font-family: var(--sans);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s !important;
+}
+
+.nav-language-select:hover {
+  border-color: var(--border-card-hover) !important;
+  background-color: var(--bg-card-hover) !important;
+}
+
+.nav-language-select:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
+}
+
+/* GPS Location Button Hover Effects */
+.gps-btn {
+  transition: all 0.2s ease-in-out !important;
+}
+
+.gps-btn:hover {
+  border-color: #3b82f6 !important;
+  background-color: var(--bg-card-hover) !important;
+  color: #3b82f6 !important;
+  transform: translateY(-1px);
+}
+
+.gps-btn:active {
+  transform: translateY(0);
+}
