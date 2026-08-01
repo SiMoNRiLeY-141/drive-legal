@@ -63,6 +63,12 @@ function asStringList(value) {
   return Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.length <= 400).slice(0, 5) : [];
 }
 
+function parseGeneratedResponse(rawText) {
+  if (typeof rawText !== "string" || !rawText.trim()) throw new Error("Missing structured response");
+  const normalized = rawText.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
+  return JSON.parse(normalized);
+}
+
 export default async function handler(request, response) {
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST");
@@ -86,7 +92,20 @@ export default async function handler(request, response) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.2, maxOutputTokens: 900 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: {
+              type: "object",
+              properties: {
+                summary: { type: "string" },
+                questions: { type: "array", items: { type: "string" } },
+                nextSteps: { type: "array", items: { type: "string" } },
+              },
+              required: ["summary", "questions", "nextSteps"],
+            },
+            temperature: 0.2,
+            maxOutputTokens: 1600,
+          },
         }),
         signal: AbortSignal.timeout(20_000),
       },
@@ -98,10 +117,10 @@ export default async function handler(request, response) {
       return sendFailure(response, failure.status, failure.code, failure.error, failure.retryable);
     }
     const providerData = await providerResponse.json();
-    const rawText = providerData?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = providerData?.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === "string")?.text;
     let generated;
     try {
-      generated = JSON.parse(rawText);
+      generated = parseGeneratedResponse(rawText);
     } catch {
       logFailure({ requestId, category: "MALFORMED_RESPONSE", providerStatus: providerResponse.status, elapsedMs: Date.now() - startedAt });
       return sendFailure(response, 502, "MALFORMED_RESPONSE", "The analysis service returned an incomplete response. Please try again.", true);
