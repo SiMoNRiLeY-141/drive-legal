@@ -17,6 +17,27 @@ function sendJson(response, status, value) {
   response.status(status).setHeader("Content-Type", "application/json; charset=utf-8").json(value);
 }
 
+function sendFailure(response, status, code, error, retryable) {
+  return sendJson(response, status, { code, error, retryable });
+}
+
+function providerFailure(providerStatus, providerCode) {
+  if (providerStatus === 401 || providerStatus === 403 || providerCode === "API_KEY_INVALID" || providerCode === "PERMISSION_DENIED") {
+    return { status: 503, code: "CONFIGURATION", error: "The analysis service needs attention. Please try again later.", retryable: false };
+  }
+  if (providerStatus === 429 || providerCode === "RESOURCE_EXHAUSTED") {
+    return { status: 429, code: "RATE_LIMIT", error: "The analysis service is busy. Please wait a minute and try again.", retryable: true };
+  }
+  if (providerStatus >= 500 || providerStatus === 408 || providerStatus === 504) {
+    return { status: 503, code: "TEMPORARY", error: "The analysis service is temporarily unavailable. Please try again shortly.", retryable: true };
+  }
+  return { status: 502, code: "PROVIDER_RESPONSE", error: "The analysis service could not prepare guidance. Please try again.", retryable: true };
+}
+
+function logFailure({ requestId, category, providerStatus, elapsedMs }) {
+  console.error(JSON.stringify({ event: "analysis_failure", requestId, category, providerStatus, elapsedMs }));
+}
+
 function isRateLimited(request) {
   const forwarded = request.headers["x-forwarded-for"];
   const key = (Array.isArray(forwarded) ? forwarded[0] : forwarded || request.socket?.remoteAddress || "unknown").split(",")[0].trim();
@@ -47,11 +68,13 @@ export default async function handler(request, response) {
     response.setHeader("Allow", "POST");
     return sendJson(response, 405, { error: "Method not allowed." });
   }
-  if (isRateLimited(request)) return sendJson(response, 429, { error: "Too many requests. Please wait a minute and try again." });
-  if (!validBody(request.body)) return sendJson(response, 400, { error: "Enter valid India citation details before requesting an analysis." });
-  if (!process.env.GEMINI_API_KEY) return sendJson(response, 503, { error: "The analysis service is not configured. Please try again later." });
+  if (isRateLimited(request)) return sendFailure(response, 429, "RATE_LIMIT", "Too many requests. Please wait a minute and try again.", true);
+  if (!validBody(request.body)) return sendFailure(response, 400, "INVALID_REQUEST", "Enter valid India citation details before requesting an analysis.", false);
+  if (!process.env.GEMINI_API_KEY) return sendFailure(response, 503, "CONFIGURATION", "The analysis service needs attention. Please try again later.", false);
 
   const { state, city, vehicleType, violation, language } = request.body;
+  const requestId = request.headers["x-vercel-id"] || crypto.randomUUID();
+  const startedAt = Date.now();
   const languageName = LANGUAGE_NAMES[language];
   const prompt = `You provide cautious, general information about Indian traffic citations. This is not legal advice. Write in ${languageName}. Do not estimate fines, state deadlines, assess guilt, advise whether to pay or contest, invent statutes, claim a legal outcome, or give procedural instructions that are not explicitly supported by the user's notice. Return JSON only with summary, questions, and nextSteps.\n\nCitation details:\nState or union territory: ${state.trim()}\nCity or district: ${city.trim()}\nVehicle: ${vehicleType.trim()}\nAlleged violation: ${violation.trim()}\n\nThe summary must be two cautious sentences. questions and nextSteps must each contain 3 to 5 short, practical items. Include checking the original notice and official channel.\n\nJSON schema:\n{"summary":"string","questions":["string"],"nextSteps":["string"]}`;
 
@@ -68,19 +91,35 @@ export default async function handler(request, response) {
         signal: AbortSignal.timeout(20_000),
       },
     );
-    if (!providerResponse.ok) throw new Error("Provider request failed");
+    if (!providerResponse.ok) {
+      const providerBody = await providerResponse.json().catch(() => ({}));
+      const failure = providerFailure(providerResponse.status, providerBody?.error?.status);
+      logFailure({ requestId, category: failure.code, providerStatus: providerResponse.status, elapsedMs: Date.now() - startedAt });
+      return sendFailure(response, failure.status, failure.code, failure.error, failure.retryable);
+    }
     const providerData = await providerResponse.json();
     const rawText = providerData?.candidates?.[0]?.content?.parts?.[0]?.text;
-    const generated = JSON.parse(rawText);
+    let generated;
+    try {
+      generated = JSON.parse(rawText);
+    } catch {
+      logFailure({ requestId, category: "MALFORMED_RESPONSE", providerStatus: providerResponse.status, elapsedMs: Date.now() - startedAt });
+      return sendFailure(response, 502, "MALFORMED_RESPONSE", "The analysis service returned an incomplete response. Please try again.", true);
+    }
     const result = {
       summary: typeof generated.summary === "string" && generated.summary.length <= 900 ? generated.summary : "Review the original citation carefully and verify its details through an official channel.",
       questions: asStringList(generated.questions),
       nextSteps: asStringList(generated.nextSteps),
       sources: SOURCES,
     };
-    if (result.questions.length < 2 || result.nextSteps.length < 2) throw new Error("Invalid provider response");
+    if (result.questions.length < 2 || result.nextSteps.length < 2) {
+      logFailure({ requestId, category: "MALFORMED_RESPONSE", providerStatus: providerResponse.status, elapsedMs: Date.now() - startedAt });
+      return sendFailure(response, 502, "MALFORMED_RESPONSE", "The analysis service returned an incomplete response. Please try again.", true);
+    }
     return sendJson(response, 200, result);
-  } catch {
-    return sendJson(response, 502, { error: "The analysis service could not prepare guidance right now. Please try again later." });
+  } catch (error) {
+    const category = error?.name === "TimeoutError" || error?.name === "AbortError" ? "TIMEOUT" : "TEMPORARY";
+    logFailure({ requestId, category, providerStatus: null, elapsedMs: Date.now() - startedAt });
+    return sendFailure(response, 503, category, "The analysis service is temporarily unavailable. Please try again shortly.", true);
   }
 }
